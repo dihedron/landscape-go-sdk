@@ -1,0 +1,189 @@
+package landscape
+
+import (
+	"context"
+	"log/slog"
+	"time"
+
+	"github.com/dihedron/rawdata"
+)
+
+type Computer2Service struct {
+	Service
+}
+
+type Computer2Result struct {
+	Count    int        `json:"count,omitempy" yaml:"count,omitempy"`
+	Results  []Computer `json:"results,omitempy" yaml:"results,omitempy"`
+	Next     string     `json:"next,omitempy" yaml:"next,omitempy"`
+	Previous any        `json:"previous,omitempy" yaml:"previous,omitempy"`
+}
+
+type Computer2 struct {
+	ID                    int       `json:"id,omitempy" yaml:"id,omitempy"`
+	Title                 string    `json:"title,omitempy" yaml:"title,omitempy"`
+	Comment               string    `json:"comment,omitempy" yaml:"comment,omitempy"`
+	Hostname              string    `json:"hostname,omitempy" yaml:"hostname,omitempy"`
+	TotalMemory           int       `json:"total_memory,omitempy" yaml:"total_memory,omitempy"`
+	TotalSwap             int       `json:"total_swap,omitempy" yaml:"total_swap,omitempy"`
+	RebootRequiredFlag    bool      `json:"reboot_required_flag,omitempy" yaml:"reboot_required_flag,omitempy"`
+	UpdateManagerPrompt   string    `json:"update_manager_prompt,omitempy" yaml:"update_manager_prompt,omitempy"`
+	CloneID               any       `json:"clone_id,omitempy" yaml:"clone_id,omitempy"`
+	LastExchangeTime      any       `json:"last_exchange_time,omitempy" yaml:"last_exchange_time,omitempy"`
+	LastPingTime          time.Time `json:"last_ping_time,omitempy" yaml:"last_ping_time,omitempy"`
+	Tags                  []string  `json:"tags,omitempy" yaml:"tags,omitempy"`
+	AccessGroup           string    `json:"access_group,omitempy" yaml:"access_group,omitempy"`
+	Distribution          string    `json:"distribution,omitempy" yaml:"distribution,omitempy"`
+	CloudInstanceMetadata struct {
+	} `json:"cloud_instance_metadata,omitempy" yaml:"cloud_instance_metadata,omitempy"`
+	VMInfo        any   `json:"vm_info,omitempy" yaml:"vm_info,omitempy"`
+	ContainerInfo any   `json:"container_info,omitempy" yaml:"container_info,omitempy"`
+	UbuntuProInfo any   `json:"ubuntu_pro_info,omitempy" yaml:"ubuntu_pro_info,omitempy"`
+	IsWslInstance bool  `json:"is_wsl_instance,omitempy" yaml:"is_wsl_instance,omitempy"`
+	Children      []any `json:"children,omitempy" yaml:"children,omitempy"`
+	Parent        any   `json:"parent,omitempy" yaml:"parent,omitempy"`
+}
+
+// UnmarshalFlag provides support for loading computer's data at the
+// command line from a file on disk.
+func (c *Computer2) UnmarshalFlag(value string) error {
+	return rawdata.UnmarshalInto(value, c)
+}
+
+// Read reads information about a computer.
+func (s *Computer2Service) Read(ctx context.Context, id string) (*Computer2, error) {
+	//error := &Error{}
+	response, err := s.client.
+		R().
+		SetContext(ctx).
+		SetPathParam("id", id).
+		SetQueryParam("options", "raw").
+		SetResult(&ComputerResult{}).
+		//SetResultError(error).
+		Get("/computers/{id}")
+	if err != nil {
+		slog.Error("error reading computer", "id", id, "error", err, "result", response)
+		return nil, err
+	}
+	return &(response.Result().(*ComputerResult).Results[0]), nil
+}
+
+/*
+func (s *ComputerService) Create(ctx context.Context, computer *Computer) (string, error) {
+	error := &Error{}
+	response, err := s.client.
+		R().
+		SetContext(ctx).
+		SetQueryParam("options", "raw").
+		SetBody(&userWrapper{User: user}).
+		SetResultError(error).
+		Post("/users")
+	if err != nil {
+		slog.Error("error creating user", "user", *user, "error", err, "result", response)
+		return "", err
+	}
+	if response.StatusCode() == http.StatusCreated {
+		location := response.Header().Get("Location")
+		id := location[strings.LastIndex(location, "users/")+len("users/"):]
+		slog.Debug("user created", "location", location, "id", id)
+		return id, nil
+	} else if response.StatusCode() == http.StatusConflict {
+		slog.Warn("user already exists", "user", *user)
+		return "", fmt.Errorf("user already exists")
+	}
+	return "", fmt.Errorf("unexpected status code: %d", response.StatusCode())
+}
+
+func (s *UserService) Search(ctx context.Context, query string) ([]User, error) {
+	error := &Error{}
+	slog.Debug("running search", "query", query)
+	response, err := s.client.
+		R().
+		SetContext(ctx).
+		SetQueryParam("options", "raw").
+		SetContentType("application/json").
+		SetBody(Query(query)). // NOTE: raw body
+		SetResult(userListWrapper{}).
+		SetResultError(error).
+		Post("/users/search")
+	if err != nil && response.StatusCode() != http.StatusOK {
+		slog.Error("error searching for users", "query", query, "error", err, "result", response)
+		return nil, err
+	}
+
+	if response.StatusCode() == StatusHandledError {
+		slog.Debug("the operation incurred an error which qwas automatically fixed", "error", *error.Object.Message)
+	} else if response.StatusCode() == StatusPartialError {
+		slog.Debug("the operation was only partially successful", "error", *error.Object.Message)
+	}
+
+	return response.Result().(*userListWrapper).Object.Object, nil
+	// func() {
+	// 	f, _ := os.Create("output.json")
+	// 	defer f.Close()
+	// 	fmt.Fprintf(f, "------------------------ RESPONSE ------------------------ %s\n----------------------------------------------------------", response.String())
+	// }()
+}
+
+func (s *UserService) Delete(ctx context.Context, id string) error {
+	error := &Error{}
+	response, err := s.client.
+		R().
+		SetContext(ctx).
+		SetPathParam("id", id).
+		SetQueryParam("options", "raw").
+		SetResultError(error).
+		Delete("/users/{id}")
+	if err != nil {
+		slog.Error("error deleting user", "id", id, "error", err, "result", response)
+		return err
+	}
+	if response.StatusCode() != http.StatusNoContent {
+		slog.Error("invalid response status code in user deletion", "id", id, "error", err, "result", response)
+	}
+	return nil
+}
+
+func (s *UserService) ReadPasswordPolicy(ctx context.Context, id string) (*Password, error) {
+	error := &Error{}
+	response, err := s.client.
+		R().
+		SetContext(ctx).
+		SetPathParam("id", id).
+		SetQueryParam("options", "raw").
+		SetResult(&userPasswordPolicyWrapper{}).
+		SetResultError(error).
+		Get("/users/{id}/policy")
+	if err != nil {
+		slog.Error("error reading user password policy", "id", id, "error", err, "result", response)
+		return nil, err
+	}
+	return response.Result().(*userPasswordPolicyWrapper).Object.Password, nil
+}
+
+func (s *UserService) ResetPassword(ctx context.Context, id string, password string) error {
+	error := &Error{}
+	response, err := s.client.
+		R().
+		SetContext(ctx).
+		SetQueryParam("options", "raw").
+		SetPathParam("id", id).
+		SetBody(&userPasswordResetWrapper{ExecuteCredentialResetRequest: &PasswordResetRequest{
+			ResetMethod: new("passwordReset"),
+			UserEntry:   new(password),
+		}}).
+		SetResult(&PasswordResetResponse{}).
+		SetResultError(error).
+		Post("/users/{id}/credential")
+	if err != nil {
+		slog.Error("error creating user password reset", "user", id, "password", password, "error", err, "result", response)
+		return err
+	}
+	if response.StatusCode() != http.StatusOK {
+		slog.Error("error resetting user password", "id", id, "password", password, "message", error.Object.Message)
+		return fmt.Errorf("%s", error.Object.Message)
+	}
+	slog.Debug("user's password reset", "id", id, "password", password, "message", response.Result().(*PasswordResetResponse).Object.Message)
+	return nil
+}
+*/
