@@ -33,6 +33,140 @@ type API struct {
 	Computer *ComputerService
 }
 
+// Option configures a newly created API client, including authentication setup.
+type Option func(*API)
+
+// WithTimeout configures a custom timeout for the HTTP client.
+func WithTimeout(timeout time.Duration) Option {
+	return func(a *API) {
+		a.client.SetTimeout(timeout)
+	}
+}
+
+// WithClientTrustAnchors configures the root certificates for the HTTP client.
+func WithClientTrustAnchors(paths ...string) Option {
+	return func(a *API) {
+		a.client.SetClientRootCertificates(paths...)
+	}
+}
+
+// WithClientTrustAnchorsWatcher configures the root certificates for the HTTP client.
+func WithClientTrustAnchorsWatcher(duration time.Duration, paths ...string) Option {
+	return func(a *API) {
+		a.client.SetClientRootCertificatesWatcher(&resty.CertWatcherOptions{PoolInterval: duration}, paths...)
+	}
+}
+
+// WithClientCertificates configures the client certificates for the HTTP client;
+// load the keypair from file (e.g. tlx.LoadX509KeyPair()) or use an in-memory certificate.
+func WithClientCertificates(certs ...tls.Certificate) Option {
+	return func(a *API) {
+		a.client.SetCertificates(certs...)
+	}
+}
+
+// WithClientCertificateFromFiles configures the client certificates for the HTTP client;
+// it loads the keypair from the provided files.
+func WithClientCertificateFromFiles(certPath string, keyPath string) Option {
+	return func(a *API) {
+		a.client.SetCertificateFromFile(certPath, keyPath)
+	}
+}
+
+// WithClientCertificateFromString configures the client certificates for the HTTP client;
+// it uses the provided certificate and key as strings.
+func WithClientCertificateFromString(cert string, key string) Option {
+	return func(a *API) {
+		a.client.SetCertificateFromString(cert, key)
+	}
+}
+
+// WithClientCertificatesWatcher configures the client certificates for the HTTP client.
+func WithClientCertificatesWatcher(duration time.Duration, paths ...string) Option {
+	return func(a *API) {
+		a.client.SetClientRootCertificatesWatcher(&resty.CertWatcherOptions{PoolInterval: duration}, paths...)
+	}
+}
+
+// WithTransport configures the transport for the HTTP client.
+func WithTransport(transport http.RoundTripper) Option {
+	return func(a *API) {
+		a.client.SetTransport(transport)
+	}
+}
+
+// WithRetry configures the retry count for the HTTP client.
+func WithRetry(count int) Option {
+	return func(a *API) {
+		a.client.SetRetryCount(count)
+	}
+}
+
+// WithDebug configures the debug mode for the HTTP client.
+func WithDebug(enable bool) Option {
+	return func(a *API) {
+		a.client.SetDebug(enable)
+	}
+}
+
+func WithTraceRequest(enabled bool) Option {
+	return func(a *API) {
+		a.client.SetTrace(enabled)
+	}
+}
+
+func WithSaveResponse(enabled bool, path string) Option {
+	return func(a *API) {
+		a.client.SetResponseBodyUnlimitedReads(true).SetResponseSaveDirectory(path).SetResponseSaveToFile(enabled)
+	}
+}
+
+// WithTokenAuth initializes the client with a JWT token and configures the underlying
+// resty client to send it as the bearer token on every subsequent request.
+func WithTokenAuth(token string) Option {
+	return func(a *API) {
+		a.mu.Lock()
+		a.token = token
+		a.mu.Unlock()
+		a.client.SetAuthToken(token)
+	}
+}
+
+// WithBasicAuth authenticates immediately using email/password and stores the returned
+// token in the API, leaving the client ready for use without a separate login call.
+func WithBasicAuth(email string, password string, account string) Option {
+	return func(a *API) {
+		if email == "" && password == "" {
+			return
+		}
+		if _, err := a.login(context.Background(), email, password, account); err != nil {
+			slog.Error("failed to initialize Landscape client with credentials", "error", err)
+		}
+	}
+}
+
+// New creates a Landscape API client. baseURL is your server root, e.g.
+// "https://landscape.example.com" — do not include "/api/v2".
+func New(baseURL string, opts ...Option) *API {
+	client := resty.
+		New().
+		SetBaseURL(baseURL+"/api/v2").
+		SetHeader("Accept", "application/json").
+		SetLoggerWarnLevel(true).
+		SetTimeout(30 * time.Second)
+
+	api := &API{
+		client:   client,
+		Computer: &ComputerService{client: client},
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(api)
+		}
+	}
+	return api
+}
+
 func (a *API) Close() error {
 	if a.Computer != nil {
 		a.Computer.client = nil
@@ -42,115 +176,6 @@ func (a *API) Close() error {
 		return a.client.Close()
 	}
 	return nil
-}
-
-// option defines functional options for configuring the API.
-type Option func(*resty.Client)
-
-// WithTimeout configures a custom timeout for the HTTP client.
-func WithTimeout(timeout time.Duration) Option {
-	return func(c *resty.Client) {
-		c.SetTimeout(timeout)
-	}
-}
-
-// WithClientTrustAnchors configures the root certificates for the HTTP client.
-func WithClientTrustAnchors(paths ...string) Option {
-	return func(c *resty.Client) {
-		c.SetClientRootCertificates(paths...)
-	}
-}
-
-// WithClientTrustAnchorsWatcher configures the root certificates for the HTTP client.
-func WithClientTrustAnchorsWatcher(duration time.Duration, paths ...string) Option {
-	return func(c *resty.Client) {
-		c.SetClientRootCertificatesWatcher(&resty.CertWatcherOptions{PoolInterval: duration}, paths...)
-	}
-}
-
-// WithClientCertificates configures the client certificates for the HTTP client;
-// load the keypair from file (e.g. tlx.LoadX509KeyPair()) or use an in-memory certificate.
-func WithClientCertificates(certs ...tls.Certificate) Option {
-	return func(c *resty.Client) {
-		c.SetCertificates(certs...)
-	}
-}
-
-// WithClientCertificateFromFiles configures the client certificates for the HTTP client;
-// it loads the keypair from the provided files.
-func WithClientCertificateFromFiles(certPath string, keyPath string) Option {
-	return func(c *resty.Client) {
-		c.SetCertificateFromFile(certPath, keyPath)
-	}
-}
-
-// WithClientCertificateFromString configures the client certificates for the HTTP client;
-// it uses the provided certificate and key as strings.
-func WithClientCertificateFromString(cert string, key string) Option {
-	return func(c *resty.Client) {
-		c.SetCertificateFromString(cert, key)
-	}
-}
-
-// WithClientCertificatesWatcher configures the client certificates for the HTTP client.
-func WithClientCertificatesWatcher(duration time.Duration, paths ...string) Option {
-	return func(c *resty.Client) {
-		c.SetClientRootCertificatesWatcher(&resty.CertWatcherOptions{PoolInterval: duration}, paths...)
-	}
-}
-
-// WithTransport configures the transport for the HTTP client.
-func WithTransport(transport http.RoundTripper) Option {
-	return func(c *resty.Client) {
-		c.SetTransport(transport)
-	}
-}
-
-// WithRetry configures the retry count for the HTTP client.
-func WithRetry(count int) Option {
-	return func(c *resty.Client) {
-		c.SetRetryCount(count)
-	}
-}
-
-// WithDebug configures the debug mode for the HTTP client.
-func WithDebug(enable bool) Option {
-	return func(c *resty.Client) {
-		c.SetDebug(enable)
-	}
-}
-
-func WithTraceRequest(enabled bool) Option {
-	return func(c *resty.Client) {
-		c.SetTrace(enabled)
-	}
-}
-
-func WithSaveResponse(enabled bool, path string) Option {
-	return func(c *resty.Client) {
-		c.SetResponseBodyUnlimitedReads(true).SetResponseSaveDirectory(path).SetResponseSaveToFile(enabled)
-	}
-}
-
-// New creates a Landscape API client. baseURL is your server root, e.g.
-// "https://landscape.example.com" — do not include "/api/v2".
-func New(baseURL string, username string, password string, account string, opts ...Option) *API {
-	client := resty.
-		New().
-		SetBasicAuth(username, password).
-		SetBaseURL(baseURL+"/api/v2").
-		SetHeader("Accept", "application/json").
-		SetLoggerWarnLevel(true).
-		SetTimeout(30 * time.Second)
-	for _, opt := range opts {
-		opt(client)
-	}
-
-	// new go 1.27 initialisation of nested anonymous structs
-	return &API{
-		client:   client,
-		Computer: &ComputerService{client: client},
-	}
 }
 
 // LoginRequest is the body sent to POST /api/v2/login.
@@ -188,11 +213,11 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("landscape api error: %s: %s", e.Code, e.Message)
 }
 
-// Login authenticates with email/password and stores the returned JWT on
+// login authenticates with email/password and stores the returned JWT on
 // the underlying resty client. Every subsequent request made through this
 // Client will automatically carry "Authorization: Bearer <token>", so you
 // never need to attach it yourself on later calls.
-func (a *API) Login(ctx context.Context, email, password, account string) (*LoginResponse, error) {
+func (a *API) login(ctx context.Context, email, password, account string) (*LoginResponse, error) {
 	var result LoginResponse
 	var failure APIError
 

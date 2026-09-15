@@ -31,16 +31,15 @@ type Command struct {
 
 func (cmd *Command) GetAPI() *landscape.API {
 	options := []landscape.Option{
+		landscape.WithBasicAuth(cmd.Email, cmd.Password, cmd.Account),
 		landscape.WithDebug(cmd.Debug),
+		landscape.WithTraceRequest(true),
 	}
 	if cmd.ResponseSavePath != nil {
 		options = append(options, landscape.WithSaveResponse(true, *cmd.ResponseSavePath))
 	}
-	if cmd.Debug {
-		options = append(options, landscape.WithDebug(true), landscape.WithTraceRequest(true))
-	}
 
-	return landscape.New(cmd.Endpoint, cmd.Email, cmd.Password, cmd.Account)
+	return landscape.New(cmd.Endpoint, options...)
 }
 
 func (cmd *Command) Write(stream io.Writer, object any) error {
