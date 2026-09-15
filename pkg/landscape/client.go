@@ -33,6 +33,16 @@ type API struct {
 	Computer *ComputerService
 }
 
+// Error models Landscape's JSON error body for non-2xx responses.
+type Error struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+func (e *Error) Error() string {
+	return fmt.Sprintf("landscape api error: %s: %s", e.Code, e.Message)
+}
+
 // Option configures a newly created API client, including authentication setup.
 type Option func(*API)
 
@@ -201,16 +211,6 @@ type Account struct {
 	Title   string `json:"title"`
 	Name    string `json:"name"`
 	Default bool   `json:"default"`
-}
-
-// APIError models Landscape's JSON error body for non-2xx responses.
-type APIError struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
-
-func (e *APIError) Error() string {
-	return fmt.Sprintf("landscape api error: %s: %s", e.Code, e.Message)
 }
 
 // login authenticates with email/password and stores the returned JWT on

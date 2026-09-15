@@ -138,7 +138,7 @@ type ComputerListResponse struct {
 // and expanded via opts. Corresponds to GET /computers.
 func (s *ComputerService) List(ctx context.Context, opts ComputerListOptions) (*ComputerListResponse, error) {
 	var result ComputerListResponse
-	var failure APIError
+	var failure Error
 
 	resp, err := s.client.R().
 		SetContext(ctx).
@@ -188,7 +188,7 @@ func (o ComputerReadOptions) queryParams() map[string]string {
 // GET /computers/<int:computer_id>.
 func (s *ComputerService) Read(ctx context.Context, id int, opts ComputerReadOptions) (*Computer, error) {
 	var result Computer
-	var failure APIError
+	var failure Error
 
 	resp, err := s.client.R().
 		SetContext(ctx).
@@ -223,7 +223,7 @@ func (s *ComputerService) Delete(ctx context.Context, computerIDs ...int) error 
 		return fmt.Errorf("delete computers: at least one computer ID is required")
 	}
 
-	var failure APIError
+	var failure Error
 
 	resp, err := s.client.R().
 		SetContext(ctx).
