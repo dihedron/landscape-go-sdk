@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
+	"github.com/joho/godotenv"
 	"resty.dev/v3"
 )
 
@@ -177,6 +179,54 @@ func New(baseURL string, opts ...Option) *API {
 	return api
 }
 
+// NewFromEnv creates a Landscape API client the same way New does, but
+// derives the authentication option from environment variables instead of
+// requiring the caller to pass one explicitly. It reads LANDSCAPE_EMAIL,
+// LANDSCAPE_PASSWORD, LANDSCAPE_ACCOUNT and LANDSCAPE_TOKEN, falling back to
+// an .env file in the current directory for any that aren't already set in
+// the process environment; the .env file is only parsed in memory, never
+// applied to the process environment. If LANDSCAPE_TOKEN is set, it takes
+// precedence and only WithTokenAuth is used, even when email/password/account
+// are also present. baseURL and any additional opts are forwarded to New.
+func NewFromEnv(baseURL string, opts ...Option) *API {
+	email, password, account, token := loadEnvCredentials()
+
+	var authOpt Option
+	if token != "" {
+		authOpt = WithTokenAuth(token)
+	} else {
+		authOpt = WithBasicAuth(email, password, account)
+	}
+
+	return New(baseURL, append([]Option{authOpt}, opts...)...)
+}
+
+// loadEnvCredentials resolves the Landscape credential environment variables,
+// preferring values already set in the process environment and falling back
+// to an .env file in the current directory (read in memory only, so the
+// process environment is never modified).
+func loadEnvCredentials() (email, password, account, token string) {
+	fileVars, err := godotenv.Read()
+	if err != nil {
+		slog.Debug("no .env file loaded", "error", err)
+	}
+
+	lookup := func(key string) string {
+		if v, ok := os.LookupEnv(key); ok {
+			slog.Debug("loaded environment variable", "key", key, "source", "environment")
+			return v
+		}
+		if v, ok := fileVars[key]; ok {
+			slog.Debug("loaded environment variable", "key", key, "source", ".env file")
+			return v
+		}
+		slog.Debug("environment variable not set", "key", key)
+		return ""
+	}
+
+	return lookup("LANDSCAPE_EMAIL"), lookup("LANDSCAPE_PASSWORD"), lookup("LANDSCAPE_ACCOUNT"), lookup("LANDSCAPE_TOKEN")
+}
+
 func (a *API) Close() error {
 	if a.Computer != nil {
 		a.Computer.client = nil
@@ -219,7 +269,7 @@ type Account struct {
 // never need to attach it yourself on later calls.
 func (a *API) login(ctx context.Context, email, password, account string) (*LoginResponse, error) {
 	var result LoginResponse
-	var failure APIError
+	var failure Error
 
 	resp, err := a.client.R().
 		SetContext(ctx).

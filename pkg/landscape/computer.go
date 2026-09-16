@@ -43,7 +43,7 @@ type Computer struct {
 	TotalSwap             int               `json:"total_swap,omitempty" yaml:"total_swap,omitempty"`
 	RebootRequiredFlag    bool              `json:"reboot_required_flag,omitempty" yaml:"reboot_required_flag,omitempty"`
 	UpdateManagerPrompt   *string           `json:"update_manager_prompt,omitempty" yaml:"update_manager_prompt,omitempty"`
-	CloneID               int               `json:"clone_id" yaml:"clone_id"`
+	CloneID               int               `json:"clone_id,omitempty" yaml:"clone_id,omitempty"`
 	LastExchangeTime      *time.Time        `json:"last_exchange_time,omitempty" yaml:"last_exchange_time,omitempty"`
 	LastPingTime          *time.Time        `json:"last_ping_time,omitempty" yaml:"last_ping_time,omitempty"`
 	RegisteredAt          *time.Time        `json:"registered_at,omitempty" yaml:"registered_at,omitempty"`
