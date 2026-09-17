@@ -219,7 +219,7 @@ type Account struct {
 // never need to attach it yourself on later calls.
 func (a *API) login(ctx context.Context, email, password, account string) (*LoginResponse, error) {
 	var result LoginResponse
-	var failure APIError
+	var failure Error
 
 	resp, err := a.client.R().
 		SetContext(ctx).
