@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -70,7 +71,7 @@ type Computer struct {
 // need to set what they care about. See the Landscape docs for the full
 // set of "query" selector prefixes (tag:, hostname:, distribution:, ...).
 type ComputerListOptions struct {
-	Query               string
+	Query               ComputerQuery
 	Limit               int
 	Offset              int
 	WithAlerts          bool
@@ -91,10 +92,87 @@ type ComputerListOptions struct {
 	WSLChildren bool
 }
 
+// ComputerQuery contains the selector tokens accepted by GET /computers.
+// Values are emitted as space-separated query tokens in the order listed.
+type ComputerQuery struct {
+	Keywords                  []string
+	Tags                      []string
+	Distributions             []string
+	Hostnames                 []string
+	Titles                    []string
+	Alerts                    []string
+	AccessGroups              []string
+	IDs                       []int
+	MACs                      []string
+	IPs                       []string
+	Searches                  []string
+	Needs                     []string
+	LicenseIDs                []string
+	Annotations               []string
+	Profiles                  []string
+	ReleaseUpgrade            []string
+	LicenseTypes              []string
+	Contracts                 []string
+	ContractExpiresWithinDays []int
+	LicenseExpiresWithinDays  []int
+	HasProManagement          []bool
+}
+
+func (q ComputerQuery) String() string {
+	tokens := append([]string{}, q.Keywords...)
+	appendValues := func(prefix string, values []string) {
+		for index, value := range values {
+			if index > 0 {
+				tokens = append(tokens, "OR")
+			}
+			tokens = append(tokens, prefix+value)
+		}
+	}
+	appendIDs := func(prefix string, values []int) {
+		for index, value := range values {
+			if index > 0 {
+				tokens = append(tokens, "OR")
+			}
+			tokens = append(tokens, prefix+strconv.Itoa(value))
+		}
+	}
+	appendBools := func(prefix string, values []bool) {
+		for index, value := range values {
+			if index > 0 {
+				tokens = append(tokens, "OR")
+			}
+			tokens = append(tokens, prefix+strconv.FormatBool(value))
+		}
+	}
+
+	appendValues("tag:", q.Tags)
+	appendValues("distribution:", q.Distributions)
+	appendValues("hostname:", q.Hostnames)
+	appendValues("title:", q.Titles)
+	appendValues("alert:", q.Alerts)
+	appendValues("access-group:", q.AccessGroups)
+	appendIDs("id:", q.IDs)
+	appendValues("mac:", q.MACs)
+	appendValues("ip:", q.IPs)
+	appendValues("search:", q.Searches)
+	appendValues("needs:", q.Needs)
+	appendValues("license-id:", q.LicenseIDs)
+	appendValues("annotation:", q.Annotations)
+	appendValues("profile:", q.Profiles)
+	appendValues("release-upgrade:", q.ReleaseUpgrade)
+	appendValues("license-type:", q.LicenseTypes)
+	appendValues("contract:", q.Contracts)
+	appendIDs("contract-expires-within-days:", q.ContractExpiresWithinDays)
+	appendIDs("license-expires-within-days:", q.LicenseExpiresWithinDays)
+	appendBools("has-pro-management:", q.HasProManagement)
+
+	return strings.Join(tokens, " ")
+}
+
 func (o ComputerListOptions) queryParams() map[string]string {
 	params := map[string]string{}
-	if o.Query != "" {
-		params["query"] = o.Query
+	if query := o.Query.String(); query != "" {
+		params["query"] = query
 	}
 	if o.Limit > 0 {
 		params["limit"] = strconv.Itoa(o.Limit)
