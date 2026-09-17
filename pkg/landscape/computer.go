@@ -212,6 +212,188 @@ type ComputerListResponse struct {
 	Previous *string    `json:"previous"`
 }
 
+// ComputerGroup is a Unix group reported for a computer.
+type ComputerGroup struct {
+	ID         int    `json:"id"`
+	ComputerID int    `json:"computer_id"`
+	GID        int    `json:"gid"`
+	Name       string `json:"name"`
+}
+
+// ComputerGroupsResponse is the response from a computer groups endpoint.
+type ComputerGroupsResponse struct {
+	Groups []ComputerGroup `json:"groups"`
+}
+
+// ComputerPackage is a package reported for a computer.
+type ComputerPackage struct {
+	Name             string  `json:"name"`
+	Summary          string  `json:"summary"`
+	Status           string  `json:"status"`
+	CurrentVersion   *string `json:"current_version"`
+	AvailableVersion *string `json:"available_version"`
+}
+
+// ComputerPackageListOptions holds the query parameters for Packages.
+type ComputerPackageListOptions struct {
+	// TODO: The REST documentation describes query as selecting computers to
+	// query packages on, although computer_id already scopes this endpoint.
+	// Query    ComputerQuery
+	Search    string
+	Names     []string
+	Installed *bool
+	Available *bool
+	Upgrade   *bool
+	Held      *bool
+	Limit     int
+	Offset    int
+}
+
+func (o ComputerPackageListOptions) queryParams() map[string]string {
+	params := map[string]string{}
+	// TODO: Enable query once the REST endpoint's behavior is clarified.
+	// if query := o.Query.String(); query != "" {
+	// 	params["query"] = query
+	// }
+	if o.Search != "" {
+		params["search"] = o.Search
+	}
+	for index, name := range o.Names {
+		if name != "" {
+			params[fmt.Sprintf("names.%d", index+1)] = name
+		}
+	}
+	setBool := func(key string, value *bool) {
+		if value != nil {
+			params[key] = strconv.FormatBool(*value)
+		}
+	}
+	setBool("installed", o.Installed)
+	setBool("available", o.Available)
+	setBool("upgrade", o.Upgrade)
+	setBool("held", o.Held)
+	if o.Limit > 0 {
+		params["limit"] = strconv.Itoa(o.Limit)
+	}
+	if o.Offset > 0 {
+		params["offset"] = strconv.Itoa(o.Offset)
+	}
+	return params
+}
+
+// ComputerPackageListResponse is the paginated response from packages.
+type ComputerPackageListResponse struct {
+	Count    int               `json:"count"`
+	Results  []ComputerPackage `json:"results"`
+	Next     *string           `json:"next"`
+	Previous *string           `json:"previous"`
+}
+
+// ComputerProcess is an active process reported for a computer.
+type ComputerProcess struct {
+	ID             int        `json:"id"`
+	ComputerID     int        `json:"computer_id"`
+	PID            int        `json:"pid"`
+	GID            int        `json:"gid"`
+	Name           string     `json:"name"`
+	State          string     `json:"state"`
+	StartTime      *time.Time `json:"start_time"`
+	VMSize         int        `json:"vm_size"`
+	CPUUtilisation int        `json:"cpu_utilisation"`
+}
+
+// ComputerProcessListResponse is the paginated response from processes.
+type ComputerProcessListResponse struct {
+	Count    int               `json:"count"`
+	Results  []ComputerProcess `json:"results"`
+	Next     *string           `json:"next"`
+	Previous *string           `json:"previous"`
+}
+
+// ComputerProcessListOptions holds the query parameters for Processes.
+type ComputerProcessListOptions struct {
+	Limit  int
+	Offset int
+}
+
+func (o ComputerProcessListOptions) queryParams() map[string]string {
+	params := map[string]string{}
+	if o.Limit > 0 {
+		params["limit"] = strconv.Itoa(o.Limit)
+	}
+	if o.Offset > 0 {
+		params["offset"] = strconv.Itoa(o.Offset)
+	}
+	return params
+}
+
+// ComputerSnap describes an installed snap on a computer.
+type ComputerSnap struct {
+	Version         string            `json:"version"`
+	Revision        string            `json:"revision"`
+	TrackingChannel string            `json:"tracking_channel"`
+	HeldUntil       *time.Time        `json:"held_until"`
+	Confinement     string            `json:"confinement"`
+	Snap            InstalledSnapInfo `json:"snap"`
+}
+
+// InstalledSnapInfo identifies an installed snap.
+type InstalledSnapInfo struct {
+	ID        string        `json:"id"`
+	Name      string        `json:"name"`
+	Publisher SnapPublisher `json:"publisher"`
+	Summary   string        `json:"summary"`
+}
+
+// SnapPublisher identifies the publisher of a snap.
+type SnapPublisher struct {
+	Username   string `json:"username"`
+	Validation string `json:"validation"`
+}
+
+// InstalledSnapListOptions holds the query parameters for InstalledSnaps.
+type InstalledSnapListOptions struct {
+	Limit  int
+	Offset int
+}
+
+func (o InstalledSnapListOptions) queryParams() map[string]string {
+	params := map[string]string{}
+	if o.Limit > 0 {
+		params["limit"] = strconv.Itoa(o.Limit)
+	}
+	if o.Offset > 0 {
+		params["offset"] = strconv.Itoa(o.Offset)
+	}
+	return params
+}
+
+// InstalledSnapListResponse is the paginated response from installed snaps.
+type InstalledSnapListResponse struct {
+	Count    int            `json:"count"`
+	Results  []ComputerSnap `json:"results"`
+	Next     *string        `json:"next"`
+	Previous *string        `json:"previous"`
+}
+
+// WSLChild describes a WSL instance associated with a computer.
+type WSLChild struct {
+	Name       string  `json:"name"`
+	ComputerID *int    `json:"computer_id"`
+	VersionID  string  `json:"version_id"`
+	Compliance string  `json:"compliance"`
+	Profile    *string `json:"profile"`
+	IsRunning  bool    `json:"is_running"`
+	Installed  bool    `json:"installed"`
+	Registered bool    `json:"registered"`
+	Default    *bool   `json:"default"`
+}
+
+// WSLChildrenResponse is the response from the WSL children endpoint.
+type WSLChildrenResponse struct {
+	Children []WSLChild `json:"children"`
+}
+
 // List returns computers associated with the account, optionally filtered
 // and expanded via opts. Corresponds to GET /computers.
 func (s *ComputerService) List(ctx context.Context, opts ComputerListOptions) (*ComputerListResponse, error) {
